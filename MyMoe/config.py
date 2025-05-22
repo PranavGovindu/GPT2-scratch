@@ -5,11 +5,20 @@ class ModelArgs(NamedTuple):
     """
     Configuration class.
     """
+    
     vocab_size: int = 8000     
     embed_dim: int = 256      
     num_layers: int = 4       
     num_heads: int = 4        
     num_kv_heads: Optional[int] = 2 
+
+    @property
+    def head_dim(self) -> int:
+        """
+        Calculate the dimension of each attention head.
+        Returns the embedding dimension divided by the number of heads.
+        """
+        return self.embed_dim // self.num_heads
     num_latents: int = 16    
     moe_num_experts: int = 2  
     moe_top_k: int = 1

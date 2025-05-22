@@ -4,7 +4,7 @@ from typing import Optional
 from torch import Tensor
 from torch.nn import functional as F
 
-class RotatoryEmbedding(nn.Module):
+class RotaryEmbedding(nn.Module):
     """
     implements rope 
     """
