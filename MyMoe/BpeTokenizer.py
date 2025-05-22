@@ -5,8 +5,11 @@ from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.normalizers import NFD,Lowercase,StripAccents,Sequence as NormalizerSequence #text normalization
 from tokenizers.processors import TemplateProcessing
-from constants import INPUT_DATA_FILE,TOKENIZER_FILE,CHECKPOINT_DIR,RUNS_DIR_BASE 
+from constants import INPUT_DATA_FILE,TOKENIZER_FILE 
 import os
+import torch
+from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from config import ModelArgs 
 
@@ -69,7 +72,7 @@ def get_bpe_tokenizer(args_config:ModelArgs  , text_path : str,retrain : False):
         )
         
         # Training weewoo weewoo
-        print("Training the tokenizer")
+        print("starting the training process")
         tokenizer.train([text_path], trainer=trainer)
         tokenizer.save(TOKENIZER_FILE)
         print(f"Tokenizer trained and saved to {TOKENIZER_FILE}")
@@ -109,3 +112,70 @@ def get_bpe_tokenizer(args_config:ModelArgs  , text_path : str,retrain : False):
     print(f"PAD_TOKEN_ID: {PAD_TOKEN_ID}, EOS_TOKEN_ID: {EOS_TOKEN_ID}, BOS_TOKEN_ID: {BOS_TOKEN_ID}")
    
     return tokenizer, args_config
+
+#Dataset object
+class BPEDataset(Dataset):
+    """
+    Dataset class
+    """
+    def __init__(self, file_path: str, tokenizer: Tokenizer, max_seq_len: int):
+        """
+        Initializes the dataset.
+        Args:
+            file_path: dataset path
+            tokenizer: BPE tokenizer
+            max_seq_len: max seq length 
+        """
+        self.tokenizer = tokenizer
+        self.max_seq_len = max_seq_len 
+        self.examples = [] # to store processed (input_ids, target_ids) pairs.
+
+        print(f"Processing dataset from {file_path} ")
+        with open(file_path, 'r', encoding='utf-8') as f:
+            full_text = f.read()
+
+        # this could have been handled better but this is just tinyshakespeare dataset so meh
+        lines = full_text.splitlines()
+        #tqdm is not needed but style points ehehe
+        for line in tqdm(lines, desc="Tokenizing lines"):
+            if not line.strip():
+                continue
+
+            encoding = self.tokenizer.encode(line)
+            token_ids = encoding.ids 
+
+            if len(token_ids) == self.max_seq_len:
+                input_sequence = torch.tensor(token_ids[:-1], dtype=torch.long)
+                target_sequence = torch.tensor(token_ids[1:], dtype=torch.long)
+                self.examples.append({"input_ids": input_sequence, "target_ids": target_sequence})
+
+        if not self.examples:
+            print("No valid pairs were created ")
+            
+        print(f"Created {len(self.examples)} pairs from {file_path}.")
+
+    def __len__(self):
+        """Returns the  number of pairs in the dataset."""
+        return len(self.examples)
+
+    def __getitem__(self, idx):
+        """Returns the pairs at the given index."""
+        return self.examples[idx]
+
+
+#example usage
+
+# if __name__ == "__main__":
+#     args_config = ModelArgs()
+#     tokenizer, updated_args = get_bpe_tokenizer(args_config, INPUT_DATA_FILE, retrain=True)
+    
+#     dataset = BPEDataset(INPUT_DATA_FILE, tokenizer, args_config.max_seq_len)
+    
+#     print(dataset[0])
+#     print(f"Input IDs: {dataset[0]['input_ids']}")
+#     print(f"Target IDs: {dataset[0]['target_ids']}")
+#     print(f"Input IDs length: {len(dataset[0]['input_ids'])}")
+#     print(f"Target IDs length: {len(dataset[0]['target_ids'])}")
+#     print(f"Tokenizer vocab size: {tokenizer.get_vocab_size()}")
+
+    
