@@ -100,7 +100,6 @@ class RotatoryEmbedding(nn.Module):
 
         # Apply rotation
         x_rotated = x_complex * freqs_cis
-        #if u dont understand just plug in some numbers and see what happens
         # Convert back to real
         x_out = torch.view_as_real(x_rotated).flatten(-2)
         return x_out.type_as(x)
@@ -109,23 +108,23 @@ class RotatoryEmbedding(nn.Module):
         
 # example usage
 
-if __name__ == "__main__":
-    B, S, H, D = 1, 4, 1, 8  # smaller for easier visualization
-    x = torch.arange(B*S*H*D).float().reshape(B, S, H, D)  # simple increasing numbers for clarity
+# if __name__ == "__main__":
+#     B, S, H, D = 1, 4, 1, 8  # smaller for easier visualization
+#     x = torch.arange(B*S*H*D).float().reshape(B, S, H, D)  # simple increasing numbers for clarity
 
-    print("Original x:")
-    print(x)
+#     print("Original x:")
+#     print(x)
 
-    rope = RotatoryEmbedding(dim=D, max_seq_len=S)
+#     rope = RotatoryEmbedding(dim=D, max_seq_len=S)
 
-    # Get the freqs_cis for the input sequence length
-    freqs_cis = rope.get_freqs_cis(seq_len=S, device=x.device)
+#     # Get the freqs_cis for the input sequence length
+#     freqs_cis = rope.get_freqs_cis(seq_len=S, device=x.device)
 
-    # Apply the rotary embeddings
-    x_rotated = rope(x, freqs_cis)
+#     # Apply the rotary embeddings
+#     x_rotated = rope(x, freqs_cis)
 
-    print("\nRotated x:")
-    print(x_rotated)
+#     print("\nRotated x:")
+#     print(x_rotated)
 
-    print("\nShape before:", x.shape)
-    print("Shape after:", x_rotated.shape)
+#     print("\nShape before:", x.shape)
+#     print("Shape after:", x_rotated.shape)
