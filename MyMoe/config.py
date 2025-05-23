@@ -30,3 +30,5 @@ class ModelArgs(NamedTuple):
     rope_theta: float = 10000.0 
     rope_traditional: bool = False 
     use_gradient_checkpointing: bool = True 
+    moe_capacity_factor: float = 1.25
+    moe_router_noise: float = 0.1
