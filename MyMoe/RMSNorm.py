@@ -14,10 +14,12 @@ class RMSNorm(nn.Module):
     
 # testing
 
-if __name__ == "__main__":
-    rmsnorm = RMSNorm(10)
-    x = torch.randn(2, 10)
-    print(x)
-    print(rmsnorm.weight)
-    output = rmsnorm(x)
-    print(output)
+# if __name__ == "__main__":
+#     rmsnorm = RMSNorm(10)
+#     x = torch.randn(2, 10)
+#     print(x)
+#     print(rmsnorm.weight)
+#     output = rmsnorm(x)
+#     print(output)
+
+

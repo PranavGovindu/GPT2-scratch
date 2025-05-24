@@ -10,7 +10,7 @@ class ModelArgs(NamedTuple):
     embed_dim: int = 256      
     num_layers: int = 4       
     num_heads: int = 4        
-    num_kv_heads: Optional[int] = 2 
+    num_kv_heads = 2 
 
     @property
     def head_dim(self) -> int:
@@ -32,3 +32,5 @@ class ModelArgs(NamedTuple):
     use_gradient_checkpointing: bool = True 
     moe_capacity_factor: float = 1.25
     moe_router_noise: float = 0.1
+    use_gradient_checkpointing: bool = True
+    moe_aux_loss_coef: float = 0.01
