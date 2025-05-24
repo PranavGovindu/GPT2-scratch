@@ -7,7 +7,55 @@ from typing import Optional, Tuple, List
 from config import ModelArgs
 from ROPE import RotaryEmbedding
 from RMSNorm import RMSNorm
-from Transformer_Block import TransformerBlock 
+from Attention import MultiHeadLatentAttention
+from MoE import MoELayer
+
+# WORKK WORK TO DO NOT DONE NEED TO ADD ATTENTION AND PROPER NORMALIZATION
+
+# class TransformerBlock(nn.Module):
+#     def __init__(self, args: ModelArgs):
+#         super().__init__()
+#         self.args = args
+#         self.attention = MultiHeadLatentAttention(args, apply_rope_to_q=True, apply_rope_to_k=True)
+#         self.moe_layer = MoELayer(args)
+#         self.norm1 = RMSNorm(args.embed_dim, eps=args.norm_eps)
+#         self.norm2 = RMSNorm(args.embed_dim, eps=args.norm_eps)
+
+#     def forward(
+#         self,
+#         x_query_sequence: torch.Tensor,
+#         x_kv_context: torch.Tensor,
+#         rotary_emb_fn: RotaryEmbedding,
+#         freqs_cis_query_seq: Optional[torch.Tensor],
+#         freqs_cis_kv_context: Optional[torch.Tensor],
+#         kv_context_mask: Optional[torch.Tensor] = None,
+#         past_latent_kv: Optional[Tuple[torch.Tensor]] = None,
+#         use_cache: bool = False,
+#     ) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]], torch.Tensor]:
+        
+#         # Attention
+#         attn_output, attn_weights = self.attention(
+#             query_states=x_query_sequence,
+#             key_value_states=x_kv_context,
+#             rotary_emb_fn=rotary_emb_fn,
+#             freqs_cis_q=freqs_cis_query_seq,
+#             freqs_cis_k=freqs_cis_kv_context,
+#             attention_mask=kv_context_mask
+#         )
+        
+#         # Residual connection
+#         x_query_sequence = x_query_sequence + attn_output
+        
+#         # Feed-forward network
+#         ffn_output, aux_loss = self.moe_layer(x_query_sequence)
+        
+#         # Residual connection
+#         x_query_sequence = x_query_sequence + ffn_output
+        
+#         # Layer normalization
+#         x_normed = self.norm1(x_query_sequence)
+        
+#         return x_normed, aux_loss
 
 class LLM(nn.Module):
     def __init__(self, args):

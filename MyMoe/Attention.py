@@ -7,7 +7,7 @@ from config import ModelArgs
 from ROPE import RotaryEmbedding 
 
 class BaseGroupedQueryAttention(nn.Module):
-    def __init__(self, args: ModelArgs, apply_rope_to_q: bool, apply_rope_to_k: bool):
+    def __init__(self, args, apply_rope_to_q, apply_rope_to_k):
         super().__init__()
 
         self.embed_dim = args.embed_dim
@@ -28,13 +28,13 @@ class BaseGroupedQueryAttention(nn.Module):
 
     def forward(
         self,
-        query_states: torch.Tensor,
-        key_value_states: torch.Tensor,
-        rotary_emb_fn: RotaryEmbedding,
-        freqs_cis_q: Optional[torch.Tensor],
-        freqs_cis_k: Optional[torch.Tensor],
-        attention_mask: Optional[torch.Tensor] = None,
-    ) :
+        query_states,
+        key_value_states,
+        rotary_emb_fn,
+        freqs_cis_q,
+        freqs_cis_k,
+        attention_mask=None,
+    ):
         bsz, q_len, _ = query_states.shape
         _bsz_kv, kv_seq_len, _ = key_value_states.shape
 
@@ -80,7 +80,7 @@ class BaseGroupedQueryAttention(nn.Module):
 
 
 class MultiHeadLatentAttention(nn.Module):
-    def __init__(self, args: ModelArgs):
+    def __init__(self, args):
         super().__init__()
 
         self.num_latents = args.num_latents
@@ -93,15 +93,15 @@ class MultiHeadLatentAttention(nn.Module):
 
     def forward(
         self,
-        x_query_sequence: torch.Tensor,
-        x_kv_context: torch.Tensor,
-        rotary_emb_fn: RotaryEmbedding,
-        freqs_cis_q: Optional[torch.Tensor],
-        freqs_cis_k: Optional[torch.Tensor],
-        attention_mask: Optional[torch.Tensor] = None,
-        past_latent_kv: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
-        use_cache: bool = False,
-    ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
+        x_query_sequence,
+        x_kv_context,
+        rotary_emb_fn,
+        freqs_cis_q,
+        freqs_cis_k,
+        attention_mask=None,
+        past_latent_kv=None,
+        use_cache=False,
+    ):
         bsz, q_len_input_seq, _ = x_query_sequence.shape
         current_latent_kv_to_cache = None
 

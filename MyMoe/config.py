@@ -7,8 +7,8 @@ class ModelArgs(NamedTuple):
     """
     
     vocab_size: int = 8000     
-    embed_dim: int = 256      
-    num_layers: int = 4       
+    embed_dim: int = 768     
+    num_layers: int = 12      
     num_heads: int = 4        
     num_kv_heads = 2 
 
