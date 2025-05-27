@@ -3,4 +3,8 @@ MyMoe/archi.py
 MyMoe/input.txt
 MyMoe/__pycache__
 MyMoe/smallinput.txt
-
+MyMoe/train.txt
+MyMoe/validation.txt
+MyMoe/data.py
+MyMoe/checkpoints
+runs
