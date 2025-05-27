@@ -3,13 +3,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from config import ModelArgs
+# from config import ModelArgs # Not strictly needed in this file if args is passed
 import math
-from typing import Tuple
+# from typing import Tuple # Removed as per no type hints
 
 class FeedForwardExpert(nn.Module):
     """Single feed-forward network expert using SwiGLU activation."""
-    def __init__(self, embed_dim: int, ffn_dim: int, dropout_rate: float):
+    def __init__(self, embed_dim, ffn_dim, dropout_rate):
         super().__init__()
         self.w1 = nn.Linear(embed_dim, ffn_dim, bias=False)
         self.w3 = nn.Linear(embed_dim, ffn_dim, bias=False)
@@ -22,7 +22,7 @@ class FeedForwardExpert(nn.Module):
 
 class MoELayer(nn.Module):
     """Mixture of Experts layer with capacity factor and router noise."""
-    def __init__(self, args: ModelArgs):
+    def __init__(self, args): # args is an instance of ModelArgs
         super().__init__()
         self.num_experts = args.moe_num_experts
         self.top_k = args.moe_top_k
@@ -43,6 +43,23 @@ class MoELayer(nn.Module):
         self.gate = nn.Linear(args.embed_dim, self.num_experts, bias=False)
 
     def forward(self, x) :
+        """
+        Forward pass of Mixture of Experts (MoE) layer implementing a modified version of the routing algorithm 
+        from "GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding" (Lepikhin et al., 2020)
+        and "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity" (Fedus et al., 2021).
+
+    
+         
+        Implementation Notes:
+            - Derived from GShard paper's original algorithm but modified for better parallelization
+            - Uses vectorized operations instead of explicit loops for expert assignment
+            - Incorporates load balancing techniques from Switch Transformers
+            - Capacity limiting prevents expert overloading while maintaining efficiency
+            - Router noise addition during training improves expert utilization
+        Reference Papers:
+            - GShard: https://arxiv.org/abs/2006.16668
+            - Switch Transformers: https://arxiv.org/abs/2101.03961
+        """
         bsz, seq_len, dim = x.shape
         x_flat = x.view(-1, dim)
         num_tokens = x_flat.shape[0]
@@ -56,7 +73,7 @@ class MoELayer(nn.Module):
             noise = torch.randn_like(router_logits) * self.router_noise_std
             router_logits = router_logits + noise
         
-        # top 2 experts
+        # top 2 experts (actually top_k)
         raw_weights, expert_indices = torch.topk(router_logits, self.top_k, dim=-1)
         
         routing_weights_after_softmax = F.softmax(raw_weights, dim=-1, dtype=torch.float32)
@@ -74,33 +91,45 @@ class MoELayer(nn.Module):
 
         ideal_capacity_per_expert = (num_tokens / self.num_experts) * self.capacity_factor
         capacity = math.floor(ideal_capacity_per_expert)
-        capacity = max(1, capacity)
+        capacity = max(1, capacity) # Ensure capacity is at least 1
         
         flat_expert_indices = expert_indices.flatten()
         
         position_in_expert_assignment = torch.zeros_like(flat_expert_indices)
         for i in range(self.num_experts):
             expert_mask_i = (flat_expert_indices == i)
-            position_in_expert_assignment[expert_mask_i] = torch.arange(expert_mask_i.sum(), device=x.device)
+            # Calculate rank for assignments to expert i
+            position_in_expert_assignment[expert_mask_i] = torch.arange(expert_mask_i.sum(), device=x.device) 
         
         within_capacity = (position_in_expert_assignment < capacity)
         capacity_mask = within_capacity.view(num_tokens, self.top_k)
 
         routing_weights = routing_weights_after_softmax * capacity_mask.to(routing_weights_after_softmax.dtype)
         sum_routing_weights = routing_weights.sum(dim=1, keepdim=True)
-        routing_weights = torch.nan_to_num(routing_weights / (sum_routing_weights + 1e-8))
+        routing_weights = torch.nan_to_num(routing_weights / (sum_routing_weights + 1e-8), nan=0.0)
 
         final_output_flat = torch.zeros_like(x_flat)
         
-        # sending tokens to experts loop
-        for token_idx in range(num_tokens):
-            for k_idx in range(self.top_k):
-                # check if capacity is not exceeded
-                if capacity_mask[token_idx, k_idx]:
-                    expert_idx = expert_indices[token_idx, k_idx].item()
-                    weight = routing_weights[token_idx, k_idx]
-                    if weight > 0:
-                         expert_output = self.experts[expert_idx](x_flat[token_idx].unsqueeze(0))
-                         final_output_flat[token_idx] += weight * expert_output.squeeze(0)
+
+    
+        for expert_idx_loop in range(self.num_experts):
+            is_routed_to_current_expert = (expert_indices == expert_idx_loop)
+            is_valid_assignment_for_expert = is_routed_to_current_expert & capacity_mask
+            
+            source_token_indices_for_expert, source_k_choices_for_expert = is_valid_assignment_for_expert.nonzero(as_tuple=True)
+
+            if source_token_indices_for_expert.numel() == 0:
+                continue
+
+            inputs_for_this_expert = x_flat[source_token_indices_for_expert] 
+            
+            weights_for_this_expert = routing_weights[source_token_indices_for_expert, source_k_choices_for_expert]
+            
+            current_expert = self.experts[expert_idx_loop]
+            expert_output = current_expert(inputs_for_this_expert) 
+            
+            weighted_expert_output = expert_output * weights_for_this_expert.unsqueeze(-1)
+            
+            final_output_flat.index_add_(0, source_token_indices_for_expert, weighted_expert_output.to(final_output_flat.dtype))
         
         return final_output_flat.view(bsz, seq_len, dim), aux_loss.to(x.dtype)
