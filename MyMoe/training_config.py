@@ -66,3 +66,8 @@ class TrainingArgs:
     estimate_training_reqs: bool = True # Estimate total training steps for progress bar
     aux_loss_weight: float = 0.1 # Weight for auxiliary loss, if applicable
     
+    # sampling
+    generation_prompt: Optional[str] = "Once upon a time" # Default prompt, or None to start with BOS
+    generation_temperature: float = 0.8 # Sampling temperature
+    generation_top_k: Optional[int] = 50 # Top-k filtering
+    max_gen_len: int = 200# Maximum length of generated sequences

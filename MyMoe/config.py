@@ -5,7 +5,7 @@ from dataclasses import dataclass # Import dataclass
 
 @dataclass # Decorate with @dataclass
 class ModelArgs:
-    vocab_size: int = 8000     
+    vocab_size: int = 50304     
     embed_dim: int = 768     
     num_layers: int = 12      
     num_heads: int = 4        
