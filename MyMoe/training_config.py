@@ -2,19 +2,20 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict
 import time
+import os
 
 # Default paths - consider making these relative or configurable via CLI
-# For now, using placeholders that match your constants.py, assuming train.py is in MyMoe
-DEFAULT_PROJECT_ROOT = "D:/unk deeplearning stuff/MyMoe" # Adjust if needed
+# Get parent directory of MyMoe to access shared resources
+DEFAULT_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(DEFAULT_PROJECT_ROOT)  # This will be GPT2-scratch
 
 @dataclass
-class TrainingArgs:
-    # Data and paths
-    data_path: str = f"{DEFAULT_PROJECT_ROOT}/input.txt"
-    val_data_path: Optional[str] = None 
+class TrainingArgs:    # Data and paths
+    data_path: str = f"{DEFAULT_PROJECT_ROOT}/train.txt"
+    val_data_path: Optional[str] =f"{DEFAULT_PROJECT_ROOT}/validation.txt"  # Optional validation data path
     output_dir_base: str = f"{DEFAULT_PROJECT_ROOT}/checkpoints"
-    runs_dir_base: str = f"{DEFAULT_PROJECT_ROOT}/runs" # For TensorBoard
-    run_name: Optional[str] = field(default_factory=lambda: f"run_{time.strftime('%Y%m%d_%H%M%S')}")
+    runs_dir_base: str = f"{PARENT_DIR}/runs"  # TensorBoard logs in parent directory
+    run_name: Optional[str] = field(default_factory=lambda: "moe_run")
 
     # Model loading
     model_config_overrides: Optional[Dict] = field(default_factory=dict)
@@ -37,7 +38,7 @@ class TrainingArgs:
     # Validation and logging
     eval_every_n_steps: int = 250 # Set to a lower value for small datasets, e.g., 10 or 1
     log_every_n_steps: int = 1   # e.g. 1
-    generate_every_n_steps: int = 500 # e.g. 10 or 2
+    generate_every_n_steps: int = 250 # e.g. 10 or 2
     num_samples_to_generate: int = 1
     max_gen_len: int = 64
     val_split_ratio: float = 0.1
@@ -65,6 +66,12 @@ class TrainingArgs:
     use_tqdm: bool = True # Use tqdm for progress bars
     estimate_training_reqs: bool = True # Estimate total training steps for progress bar
     aux_loss_weight: float = 0.1 # Weight for auxiliary loss, if applicable
+
+        # sampling
+    generation_prompt: Optional[str] = "Once upon a time" # Default prompt, or None to start with BOS
+    generation_temperature: float = 0.8 # Sampling temperature
+    generation_top_k: Optional[int] = 50 # Top-k filtering
+    max_gen_len: int = 200# Maximum length of generated sequences
     
     # sampling
     generation_prompt: Optional[str] = "Once upon a time" # Default prompt, or None to start with BOS
