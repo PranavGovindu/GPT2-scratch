@@ -8,7 +8,6 @@ from RMSNorm import RMSNorm
 from Attention import MultiHeadLatentAttention
 from MoE import MoELayer
 from torch.utils.checkpoint import checkpoint as grad_checkpoint
-from BpeTokenizer import BpeTokenizer
 
 
 class TransformerBlock(nn.Module):

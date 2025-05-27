@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional, Tuple
 
-from config import ModelArgs
-from ROPE import RotaryEmbedding 
 
 class BaseGroupedQueryAttention(nn.Module):
     def __init__(self, args, apply_rope_to_q, apply_rope_to_k):
@@ -64,14 +61,34 @@ class BaseGroupedQueryAttention(nn.Module):
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
-        prepared_attention_mask = attention_mask
+        
+        # this is a late commit , adding attention mask for sdpa for faster inference
+        
+        prepared_attention_mask = attention_mask 
         if attention_mask is not None:
             if attention_mask.ndim == 2:
+                # Unsqueeze for broadcasting to (bsz, 1, 1, kv_seq_len)
+                # This will broadcast against the query's sequence length dimension.
                 prepared_attention_mask = attention_mask.unsqueeze(1).unsqueeze(1)
+
+            if prepared_attention_mask.dtype == torch.bool:
+                
+                # Convert boolean mask to additive mask like 0 or -inf
+                additive_mask = torch.zeros_like(prepared_attention_mask, dtype=q.dtype) 
+                
+                # Fill the positions where the mask is true with -inf
+                additive_mask.masked_fill_(prepared_attention_mask, torch.finfo(q.dtype).min)
+                prepared_attention_mask = additive_mask
+            elif prepared_attention_mask.dtype in [torch.int8, torch.int16, torch.int32, torch.int64, torch.uint8, torch.float16, torch.bfloat16, torch.float32, torch.float64]:
+
+                # efficient way to handle integer or float masks (gemini )
+                prepared_attention_mask = (1.0 - prepared_attention_mask.float()) * torch.finfo(q.dtype).min
+            else:
+                raise ValueError(f"Unsupported attention_mask dtype: {prepared_attention_mask.dtype} in BaseGroupedQueryAttention. Expected bool, integer, or float.")
 
         attn_output_intermediate = F.scaled_dot_product_attention(
             q, k, v,
-            attn_mask=prepared_attention_mask,
+            attn_mask=prepared_attention_mask, 
             dropout_p=self.attn_dropout_p if self.training else 0.0,
         )
 
@@ -126,10 +143,10 @@ class MultiHeadLatentAttention(nn.Module):
 
         output = self.input_to_latents_attn(
             query_states=x_query_sequence,
-            key_value_states=latent_k_prime,
+            key_value_states=latent_k_prime, # Using the processed/cached latents as K,V
             rotary_emb_fn=rotary_emb_fn,
             freqs_cis_q=freqs_cis_q,
-            freqs_cis_k=None,
-            attention_mask=None,
+            freqs_cis_k=None, # RoPE not applied to latent keys in this attention step
+            attention_mask=None, # No mask when attending to latents (attend to all latents)
         )
         return output, current_latent_kv_to_cache

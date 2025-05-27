@@ -1,17 +1,16 @@
-from typing import Optional
+
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.normalizers import NFD,Lowercase,StripAccents,Sequence as NormalizerSequence
 from tokenizers.processors import TemplateProcessing
-from constants import INPUT_DATA_FILE,TOKENIZER_FILE
+from constants import TOKENIZER_FILE
 import os
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from config import ModelArgs
 
 # Constants for the BPE tokenizer
 UNK_TOKEN = "[UNK]"
@@ -34,7 +33,6 @@ def get_bpe_tokenizer(args_config, text_path, retrain):
         tokenizer = Tokenizer.from_file(tokenizer_file_abs_path)
         print(f"Loaded existing BPE tokenizer from {tokenizer_file_abs_path}")
 
-        # add special tokens to the tokenizer
         pad_id = tokenizer.token_to_id(PAD_TOKEN)
         eos_id = tokenizer.token_to_id(EOS_TOKEN)
         bos_id = tokenizer.token_to_id(BOS_TOKEN)
@@ -42,15 +40,12 @@ def get_bpe_tokenizer(args_config, text_path, retrain):
         if pad_id is None or eos_id is None or bos_id is None:
             print(f"Warning: Loaded tokenizer from {tokenizer_file_abs_path} missing one or more special token IDs.")
         
-        # assign the special tokens to global variables
-        # if the special tokens are not found in the tokenizer, assign them to None
         PAD_TOKEN_ID = pad_id
         EOS_TOKEN_ID = eos_id
         BOS_TOKEN_ID = bos_id
 
-        # add post-processing and padding/truncation if tokenizer is loaded
         if BOS_TOKEN_ID is not None and EOS_TOKEN_ID is not None:
-            tokenizer.post_process=TemplateProcessing(
+            tokenizer.post_processor=TemplateProcessing(
                 single=f"{BOS_TOKEN} $A {EOS_TOKEN}",
                 special_tokens=[
                     (BOS_TOKEN, BOS_TOKEN_ID),
@@ -62,7 +57,6 @@ def get_bpe_tokenizer(args_config, text_path, retrain):
         tokenizer.enable_truncation(max_length=args_config.max_seq_len)
 
     else:
-        # tokenizer training 
         print(f"Training new BPE tokenizer from {text_path} with vocab size {args_config.vocab_size}")
 
         tokenizer = Tokenizer(BPE(unk_token=UNK_TOKEN))
@@ -86,7 +80,6 @@ def get_bpe_tokenizer(args_config, text_path, retrain):
         tokenizer.save(tokenizer_file_abs_path)
         print(f"Tokenizer trained and saved to {tokenizer_file_abs_path}")
 
-        # retrieving special token IDs
         bos_id=tokenizer.token_to_id(BOS_TOKEN)
         eos_id=tokenizer.token_to_id(EOS_TOKEN)
         pad_id=tokenizer.token_to_id(PAD_TOKEN)
@@ -94,8 +87,7 @@ def get_bpe_tokenizer(args_config, text_path, retrain):
         if bos_id is None or eos_id is None or pad_id is None:
             raise ValueError("Tokenizer did not assign IDs to special tokens after training. Check the training process.")
 
-        # add post processing tokens
-        tokenizer.post_process=TemplateProcessing(
+        tokenizer.post_processor=TemplateProcessing(
             single=f"{BOS_TOKEN} $A {EOS_TOKEN}",
             special_tokens=[
                 (BOS_TOKEN, bos_id),
@@ -129,7 +121,7 @@ def get_bpe_tokenizer(args_config, text_path, retrain):
         BOS_TOKEN_ID = final_bos_id_check
 
     actual_vocab_size = tokenizer.get_vocab_size()
-    args_config = args_config._replace(vocab_size=actual_vocab_size)
+    args_config.vocab_size = actual_vocab_size
     print(f"Updated ModelArgs with vocab size: {actual_vocab_size}")
     print(f"PAD_TOKEN_ID: {PAD_TOKEN_ID}, EOS_TOKEN_ID: {EOS_TOKEN_ID}, BOS_TOKEN_ID: {BOS_TOKEN_ID}")
 
@@ -148,18 +140,30 @@ class BPEDataset(Dataset):
             full_text = f.read()
 
         lines = full_text.splitlines()
-        #progress bad woohoo
         for line in tqdm(lines, desc="Tokenizing lines for BPEDataset"):
             if not line.strip():
                 continue
 
-            encoding = self.tokenizer.encode(line)
+            encoding = self.tokenizer.encode(line) 
             token_ids = encoding.ids
+                
+                
+            # extract attention mask, ensuring it matches the input sequence length
 
-            if len(token_ids) >= 2:
+            attention_mask_ids = encoding.attention_mask 
+
+            if len(token_ids) >= 2: # Ensure there's at least one token to predict
                 input_sequence = torch.tensor(token_ids[:-1], dtype=torch.long)
                 target_sequence = torch.tensor(token_ids[1:], dtype=torch.long)
-                self.examples.append({"input_ids": input_sequence, "target_ids": target_sequence})
+                
+                # Ensure input_sequence and target_sequence are of the same length
+                input_attention_mask = torch.tensor(attention_mask_ids[:-1], dtype=torch.long)
+
+                self.examples.append({
+                    "input_ids": input_sequence, 
+                    "target_ids": target_sequence,
+                    "attention_mask": input_attention_mask 
+                })
 
         if not self.examples:
             print(f"no valid pairs from the dataset {file_path}")
