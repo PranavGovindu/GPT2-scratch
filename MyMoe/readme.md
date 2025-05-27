@@ -1,1 +1,1 @@
-# moe project WIP
+# moe project WIP in training
