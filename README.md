@@ -89,7 +89,7 @@ The MoE implementation follows the architecture described in several key papers:
    - Memory-efficient implementation
    - KV-cache support for inference
 
-For detailed implementation information, see the [MyMoe README](MyMoe/README.md).
+For detailed implementation information, see the [MyMoe README](MyMoe/readme.md).
 
 ## GPT-2 Implementation
 
